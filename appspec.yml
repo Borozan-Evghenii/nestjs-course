@@ -1,0 +1,9 @@
+version: 0.0
+Resources:
+  - myLambdaFunction:
+      Type: AWS::Lambda::Function
+      Properties:
+        Name: FUNCTION_NAME_PLACEHOLDER
+        Alias: ALIAS_NAME_PLACEHOLDER
+        CurrentVersion: CURRENT_VERSION_PLACEHOLDER
+        TargetVersion: TARGET_VERSION_PLACEHOLDER

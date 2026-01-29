@@ -1,0 +1,72 @@
+version: 0.2
+
+env:
+  variables:
+    APP_ENV: ""
+    FUNCTION_NAME: ""
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+    commands:
+      - npm ci
+
+  pre_build:
+    commands:
+      - echo "=== Environment Configuration ==="
+      - echo "APP_ENV = $APP_ENV"
+      - echo "FUNCTION_NAME = $FUNCTION_NAME"
+      - |
+        case "$APP_ENV" in
+          prod)
+            export ALIAS_NAME="live"
+            export DEPLOYMENT_CONFIG="CodeDeployDefault.LambdaCanary10Percent10Minutes"
+            ;;
+          *)
+            export ALIAS_NAME="dev"
+            export DEPLOYMENT_CONFIG="CodeDeployDefault.LambdaAllAtOnce"
+            ;;
+        esac
+      - echo "ALIAS_NAME = $ALIAS_NAME"
+      - echo "DEPLOYMENT_CONFIG = $DEPLOYMENT_CONFIG"
+
+  build:
+    commands:
+      - npx nest build --webpack
+      - zip -r function.zip dist/
+
+  post_build:
+    commands:
+      - |
+        aws lambda update-function-code \
+          --function-name $FUNCTION_NAME \
+          --zip-file fileb://function.zip
+
+      - aws lambda wait function-updated --function-name $FUNCTION_NAME
+
+      - |
+        TARGET_VERSION=$(aws lambda publish-version \
+          --function-name $FUNCTION_NAME \
+          --query 'Version' \
+          --output text)
+        echo "Published version: $TARGET_VERSION"
+
+      - |
+        CURRENT_VERSION=$(aws lambda get-alias \
+          --function-name $FUNCTION_NAME \
+          --name $ALIAS_NAME \
+          --query 'FunctionVersion' \
+          --output text 2>/dev/null || echo "$TARGET_VERSION")
+
+      - sed -i "s/FUNCTION_NAME_PLACEHOLDER/$FUNCTION_NAME/" appspec.yml
+      - sed -i "s/ALIAS_NAME_PLACEHOLDER/$ALIAS_NAME/" appspec.yml
+      - sed -i "s/CURRENT_VERSION_PLACEHOLDER/$CURRENT_VERSION/" appspec.yml
+      - sed -i "s/TARGET_VERSION_PLACEHOLDER/$TARGET_VERSION/" appspec.yml
+
+      - echo "=== Generated appspec.yml ==="
+      - cat appspec.yml
+
+artifacts:
+  files:
+    - appspec.yml
