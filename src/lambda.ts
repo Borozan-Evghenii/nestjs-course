@@ -3,7 +3,7 @@ import { getCorsConfig } from './config/cors.config'
 import serverlessExpress from '@codegenie/serverless-express'
 import { ConfigService } from '@nestjs/config'
 import { NestFactory } from '@nestjs/core'
-import { Callback, Context, Handler } from 'aws-lambda'
+import { Context, Handler } from 'aws-lambda'
 import type { Express } from 'express'
 
 let server: Handler
@@ -21,11 +21,7 @@ async function bootstrap() {
 	return serverlessExpress({ app: expressApp }) as Handler
 }
 
-export const handler: Handler = async (
-	event: unknown,
-	context: Context,
-	callback: Callback
-): Promise<Handler> => {
+export const handler = async (event: unknown, context: Context) => {
 	server = server ?? (await bootstrap())
-	return server(event, context, callback)
+	return server(event, context, () => {})
 }

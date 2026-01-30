@@ -23,7 +23,7 @@ phases:
       - |
         case "$APP_ENV" in
           prod)
-            export ALIAS_NAME="live"
+            export ALIAS_NAME="prod"
             export DEPLOYMENT_CONFIG="CodeDeployDefault.LambdaCanary10Percent10Minutes"
             ;;
           *)
@@ -48,10 +48,11 @@ phases:
         DATABASE_PORT=$(echo $SECRET_JSON | jq -r '.port // 5432')
         DATABASE_USER=$(echo $SECRET_JSON | jq -r '.username')
         DATABASE_PASSWORD=$(echo $SECRET_JSON | jq -r '.password')
-        DATABASE_NAME=$(echo $SECRET_JSON | jq -r '.dbname')
+        DATABASE_NAME=$(echo $SECRET_JSON | jq -r '.dbname // .username')
         DATABASE_SSL=true
         EOF
       - echo ".env file updated with database credentials"
+      - cat .env
 
   build:
     commands:
