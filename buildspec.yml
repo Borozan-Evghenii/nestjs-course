@@ -4,6 +4,7 @@ env:
   variables:
     APP_ENV: ""
     FUNCTION_NAME: ""
+    DB_SECRET_NAME: ""
 
 phases:
   install:
@@ -12,11 +13,13 @@ phases:
     commands:
       - npm ci
 
+
   pre_build:
     commands:
       - echo "=== Environment Configuration ==="
       - echo "APP_ENV = $APP_ENV"
       - echo "FUNCTION_NAME = $FUNCTION_NAME"
+      - echo "DB_SECRET_NAME = $DB_SECRET_NAME"
       - |
         case "$APP_ENV" in
           prod)
@@ -30,11 +33,31 @@ phases:
         esac
       - echo "ALIAS_NAME = $ALIAS_NAME"
       - echo "DEPLOYMENT_CONFIG = $DEPLOYMENT_CONFIG"
+      - echo "=== Copying Environment File ==="
+      - cp .env.$APP_ENV .env
+      - echo "Copied .env.$APP_ENV to .env"
+      - echo "=== Fetching Database Secrets ==="
+      - |
+        SECRET_JSON=$(aws secretsmanager get-secret-value \
+          --secret-id $DB_SECRET_NAME \
+          --query SecretString \
+          --output text)
+      - |
+        cat >> .env << EOF
+        DATABASE_HOST=$(echo $SECRET_JSON | jq -r '.host')
+        DATABASE_PORT=$(echo $SECRET_JSON | jq -r '.port // 5432')
+        DATABASE_USER=$(echo $SECRET_JSON | jq -r '.username')
+        DATABASE_PASSWORD=$(echo $SECRET_JSON | jq -r '.password')
+        DATABASE_NAME=$(echo $SECRET_JSON | jq -r '.dbname')
+        DATABASE_SSL=true
+        EOF
+      - echo ".env file updated with database credentials"
 
   build:
     commands:
       - npx nest build --webpack
-      - zip -r function.zip dist/
+      - cp .env dist/
+      - cd dist && zip -r ../function.zip . && cd ..
 
   post_build:
     commands:
